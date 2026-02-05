@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GymFlow">
+    <!-- Favicon and App Icons -->
+    <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="image.png">
+    
+    <title>GymFlow Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0b101a;
+            color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            overscroll-behavior-y: contain;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .tab-active {
+            color: #38bdf8;
+            position: relative;
+        }
+        
+        .tab-active::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 20%;
+            width: 60%;
+            height: 3px;
+            background: #38bdf8;
+            border-radius: 99px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.2);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.3s ease;
+        }
+
+        .completed-card {
+            border-color: rgba(56, 189, 248, 0.4) !important;
+            background: rgba(56, 189, 248, 0.08) !important;
+        }
+
+        .level-up-card {
+            border-color: #78350f !important;
+            background: rgba(120, 53, 15, 0.1) !important;
+        }
+
+        .level-up-card.completed-card {
+            border-color: #eab308 !important;
+            background: rgba(234, 179, 8, 0.15) !important;
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.1);
+        }
+
+        @keyframes jiggle {
+            0% { transform: rotate(-0.2deg); }
+            50% { transform: rotate(0.2deg); }
+            100% { transform: rotate(-0.2deg); }
+        }
+        .animate-jiggle {
+            animation: jiggle 0.4s infinite ease-in-out;
+        }
+
+        #page-viewport {
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #page-container {
+            display: flex;
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            width: 100%;
+        }
+
+        .workout-page {
+            flex: 0 0 100%;
+            width: 100%;
+            padding: 0 20px;
+            min-height: 10px;
+        }
+
+        .dragging {
+            opacity: 0.4;
+            transform: scale(0.98);
+        }
+
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] { -moz-appearance: textfield; }
+
+        .progress-green {
+            background-color: #22c55e !important;
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+        }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+        }
+        
+        .logo-img {
+            height: 40px;
+            width: auto;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-44">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 bg-[#0b101a]/80 backdrop-blur-xl border-b border-white/5 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <img src="image.png" alt="GymFlow Logo" class="logo-img" onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block';">
+            <div id="logo-fallback" style="display: none;">
+                <h1 class="text-2xl font-black italic tracking-tighter leading-none uppercase">GYM<span class="text-sky-400 not-italic">FLOW</span></h1>
+            </div>
+            <p id="mode-label" class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] ml-1 hidden sm:block">Precision Tracker</p>
+        </div>
+        <div class="flex gap-2">
+           <button id="edit-btn" onclick="toggleEditMode()" class="p-3 rounded-2xl border border-white/10 bg-slate-900/50 text-slate-400 active:scale-90 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+           </button>
+           <button onclick="resetDaily()" class="p-3 rounded-2xl bg-slate-900/50 border border-white/10 text-slate-400 active:scale-90 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+           </button>
+        </div>
+    </header>
+
+    <!-- Tabs Row -->
+    <div id="tabs-container" class="px-5 mt-6 flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
+    </div>
+
+    <!-- Smooth Swipe Viewport -->
+    <div id="page-viewport" class="mt-8">
+        <div id="page-container">
+        </div>
+    </div>
+
+    <!-- Custom Modal UI -->
+    <div id="custom-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6 modal-overlay">
+        <div class="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl">
+            <h3 id="modal-title" class="text-xl font-black text-white mb-6 italic uppercase tracking-tight">Edit Value</h3>
+            <div class="relative mb-8">
+                <input id="modal-input" type="text" 
+                    class="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-sky-400 font-bold text-lg focus:outline-none focus:border-sky-500/50 transition-all" 
+                    placeholder="Enter value...">
+            </div>
+            <div class="flex gap-4">
+                <button onclick="closeModal()" class="flex-1 py-4 bg-slate-800 rounded-2xl text-slate-400 font-bold text-sm active:scale-95 transition-transform uppercase tracking-widest">Cancel</button>
+                <button id="modal-save-btn" class="flex-1 py-4 bg-sky-500 rounded-2xl text-white font-bold text-sm active:scale-95 transition-transform uppercase tracking-widest shadow-lg shadow-sky-500/20">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Footer -->
+    <div class="fixed bottom-0 left-0 right-0 z-40 px-5 pb-12 pt-4 bg-gradient-to-t from-[#0b101a] via-[#0b101a] to-transparent pointer-events-none">
+        <div id="progress-card" class="max-w-md mx-auto p-6 rounded-[2.5rem] border border-sky-500/20 bg-slate-900/60 transition-all duration-500 shadow-2xl pointer-events-auto">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <p id="progress-type-label" class="text-[10px] font-black uppercase tracking-widest mb-1 text-sky-500/60">Session Progress</p>
+                    <h2 id="active-tab-label" class="text-sm font-bold text-white italic tracking-tight">Mastery</h2>
+                </div>
+                <div class="text-right">
+                    <span id="progress-pct-text" class="text-2xl font-black text-white">0%</span>
+                </div>
+            </div>
+            <div class="w-full bg-slate-800/50 h-3 rounded-full overflow-hidden p-[2px] border border-white/5">
+                <div id="progress-bar" class="h-full rounded-full bg-sky-500 transition-all duration-1000 cubic-bezier(0.34, 1.56, 0.64, 1)" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let workouts = JSON.parse(localStorage.getItem('gymFlow_data')) || {
+            "Push": [
+                { id: 'p1', name: 'Chest Press Machine', sets: 3, reps: '10-12' },
+                { id: 'p2', name: 'Pec Fly Machine', sets: 3, reps: '12' },
+                { id: 'p3', name: 'Shoulder Press Machine', sets: 3, reps: '10' },
+                { id: 'p4', name: 'Lateral Raise Machine', sets: 3, reps: '15' },
+                { id: 'p5', name: 'Tricep Press Machine', sets: 3, reps: '12' }
+            ],
+            "Pull": [
+                { id: 'u1', name: 'Lat Pulldown', sets: 3, reps: '10-12' },
+                { id: 'u2', name: 'Seated Row Machine', sets: 3, reps: '10' },
+                { id: 'u3', name: 'Back Extension', sets: 3, reps: '12' },
+                { id: 'u4', name: 'Rear Delt Fly', sets: 3, reps: '15' },
+                { id: 'u5', name: 'Bicep Curl Machine', sets: 3, reps: '12' }
+            ],
+            "Legs": [
+                { id: 'l1', name: 'Leg Press Machine', sets: 3, reps: '10-12' },
+                { id: 'l2', name: 'Leg Extension', sets: 3, reps: '12' },
+                { id: 'l3', name: 'Seated Leg Curl', sets: 3, reps: '12' },
+                { id: 'l4', name: 'Abductor/Adductor', sets: 3, reps: '15' },
+                { id: 'l5', name: 'Calf Extension', sets: 3, reps: '15' },
+                { id: 'l6', name: 'Abdominal Crunch', sets: 3, reps: '20' }
+            ]
+        };
+        let tabOrder = JSON.parse(localStorage.getItem('gymFlow_tabs')) || ["Push", "Pull", "Legs"];
+        let completedIds = JSON.parse(localStorage.getItem('gymFlow_completed')) || [];
+        let weights = JSON.parse(localStorage.getItem('gymFlow_weights')) || {};
+        let levelUpIds = JSON.parse(localStorage.getItem('gymFlow_levelup')) || [];
+        
+        let activeTabIdx = 0;
+        let isEditMode = false;
+        let touchStartX = 0;
+        let draggedItemId = null;
+        let draggedTabId = null;
+        let currentModalAction = null;
+
+        function save() {
+            localStorage.setItem('gymFlow_data', JSON.stringify(workouts));
+            localStorage.setItem('gymFlow_tabs', JSON.stringify(tabOrder));
+            localStorage.setItem('gymFlow_completed', JSON.stringify(completedIds));
+            localStorage.setItem('gymFlow_weights', JSON.stringify(weights));
+            localStorage.setItem('gymFlow_levelup', JSON.stringify(levelUpIds));
+        }
+
+        function render() {
+            renderTabs();
+            renderPages();
+            updateProgress();
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            let html = tabOrder.map((tab, idx) => `
+                <div class="relative flex-shrink-0" 
+                    draggable="${isEditMode}"
+                    ondragstart="handleTabDragStart(event, '${tab}')"
+                    ondragover="event.preventDefault()"
+                    ondrop="handleTabDrop(event, '${tab}')">
+                    <button onclick="setActiveTab(${idx})" 
+                        class="px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${idx === activeTabIdx ? 'bg-sky-500/10 border-sky-500/50 text-sky-400 tab-active' : 'bg-slate-900/50 border-white/5 text-slate-500'} ${isEditMode ? 'animate-jiggle cursor-move' : ''}">
+                        ${tab}
+                    </button>
+                    ${isEditMode ? `<button onclick="removeTab(event, '${tab}')" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-lg border border-[#0b101a]"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="M18 6 6 18M6 6l12 12"/></svg></button>` : ''}
+                </div>
+            `).join('');
+            
+            if (isEditMode) {
+                html += `<button onclick="triggerAddTab()" class="p-2.5 rounded-xl bg-slate-800 border border-dashed border-white/20 text-slate-400"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg></button>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function renderPages() {
+            const container = document.getElementById('page-container');
+            container.innerHTML = tabOrder.map((tabKey, tIdx) => {
+                const list = workouts[tabKey] || [];
+                return `
+                    <div id="page-${tIdx}" class="workout-page space-y-4">
+                        ${list.map((ex, idx) => {
+                            const isComp = completedIds.includes(ex.id);
+                            const isLvl = levelUpIds.includes(ex.id);
+                            const w = weights[ex.id] || 0;
+                            return `
+                                <div 
+                                    id="card-${ex.id}" 
+                                    draggable="${isEditMode}"
+                                    ondragstart="handleDragStart(event, '${ex.id}')"
+                                    ondragover="handleDragOver(event)"
+                                    ondrop="handleDrop(event, '${ex.id}')"
+                                    onclick="toggleWorkout('${ex.id}')" 
+                                    class="relative glass-card p-5 rounded-[2.25rem] border transition-all duration-300 ${isEditMode ? 'animate-jiggle cursor-move' : 'cursor-pointer'} ${isLvl ? 'level-up-card' : ''} ${isComp ? 'completed-card' : ''}">
+                                    
+                                    ${isEditMode ? `<button onclick="removeWorkout(event, '${ex.id}')" class="absolute -top-2 -left-2 bg-red-500 text-white rounded-full p-1.5 shadow-xl z-10 border-2 border-[#0b101a]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="M5 12h14"/></svg></button>` : ''}
+                                    
+                                    <div class="flex justify-between items-center mb-5">
+                                        <h3 class="font-extrabold text-lg text-white pr-4">${ex.name}</h3>
+                                        <div class="flex items-center gap-3">
+                                            <button onclick="toggleLevelUp(event, '${ex.id}')" class="p-2.5 rounded-2xl transition-all ${isLvl ? 'bg-yellow-400 text-[#0b101a]' : 'bg-slate-800 text-slate-600'}">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="${isLvl ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="3"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                            </button>
+                                            <div class="w-11 h-11 rounded-2xl border-2 flex items-center justify-center transition-all ${isComp ? 'bg-sky-500 border-sky-500 text-white shadow-lg shadow-sky-500/20' : 'border-slate-700 text-transparent'}">
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-4 items-center">
+                                        <div class="flex flex-col gap-1.5 w-24 shrink-0">
+                                            <div onclick="triggerEditSets(event, '${ex.id}')" class="px-3 py-1.5 bg-slate-900/60 rounded-xl text-[10px] border border-white/5 active:bg-slate-800">
+                                                <span class="text-slate-500 mr-2 font-black uppercase tracking-tighter">Sets</span>
+                                                <span class="font-bold text-slate-200 text-xs">${ex.sets}</span>
+                                            </div>
+                                            <div onclick="triggerEditReps(event, '${ex.id}')" class="px-3 py-1.5 bg-slate-900/60 rounded-xl text-[10px] border border-white/5 active:bg-slate-800">
+                                                <span class="text-slate-500 mr-2 font-black uppercase tracking-tighter">Reps</span>
+                                                <span class="font-bold text-slate-200 text-xs">${ex.reps}</span>
+                                            </div>
+                                        </div>
+
+                                        <div onclick="event.stopPropagation()" class="flex-1 flex items-center justify-between bg-slate-950/40 rounded-[1.5rem] p-1.5 border border-white/5">
+                                            <button onclick="adjustWeight('${ex.id}', -5)" class="w-11 h-11 flex items-center justify-center bg-slate-800 rounded-xl text-slate-400 active:scale-90"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14"/></svg></button>
+                                            <div class="flex flex-col items-center">
+                                                <input type="number" value="${w}" oninput="manualWeight('${ex.id}', this.value)" class="bg-transparent text-xl font-black text-sky-400 w-16 text-center outline-none">
+                                                <span class="text-[9px] font-black text-slate-600 uppercase tracking-tighter -mt-1">lbs</span>
+                                            </div>
+                                            <button onclick="adjustWeight('${ex.id}', 5)" class="w-11 h-11 flex items-center justify-center bg-slate-800 rounded-xl text-slate-400 active:scale-90"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                        ${isEditMode ? `<button onclick="triggerAddWorkout()" class="w-full py-6 rounded-[2.25rem] border-2 border-dashed border-white/10 text-slate-500 flex items-center justify-center gap-2 font-bold text-sm uppercase tracking-widest active:bg-white/5 transition-colors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>Add Workout</button>` : ''}
+                    </div>
+                `;
+            }).join('');
+            syncPageOffset();
+        }
+
+        function syncPageOffset() {
+            const container = document.getElementById('page-container');
+            container.style.transform = `translateX(-${activeTabIdx * 100}%)`;
+        }
+
+        function openModal(title, placeholder, initialValue, onSave) {
+            document.getElementById('modal-title').innerText = title;
+            const input = document.getElementById('modal-input');
+            input.placeholder = placeholder;
+            input.value = initialValue;
+            document.getElementById('custom-modal').classList.remove('hidden');
+            input.focus();
+            
+            currentModalAction = () => {
+                onSave(input.value);
+                closeModal();
+            };
+
+            document.getElementById('modal-save-btn').onclick = currentModalAction;
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+            currentModalAction = null;
+        }
+
+        function handleDragStart(e, id) {
+            if (!isEditMode) return;
+            draggedItemId = id;
+            e.target.classList.add('dragging');
+            e.dataTransfer.setDragImage(e.target, 20, 20);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDrop(e, targetId) {
+            e.preventDefault();
+            if (draggedItemId === targetId) return;
+
+            const currentTab = tabOrder[activeTabIdx];
+            const list = workouts[currentTab];
+            const fromIdx = list.findIndex(item => item.id === draggedItemId);
+            const toIdx = list.findIndex(item => item.id === targetId);
+
+            const [movedItem] = list.splice(fromIdx, 1);
+            list.splice(toIdx, 0, movedItem);
+
+            draggedItemId = null;
+            save();
+            render();
+        }
+
+        function handleTabDragStart(e, tabName) {
+            if (!isEditMode) return;
+            draggedTabId = tabName;
+            e.target.classList.add('dragging');
+        }
+
+        function handleTabDrop(e, targetTabName) {
+            e.preventDefault();
+            if (draggedTabId === targetTabName) return;
+
+            const fromIdx = tabOrder.indexOf(draggedTabId);
+            const toIdx = tabOrder.indexOf(targetTabName);
+
+            const [movedTab] = tabOrder.splice(fromIdx, 1);
+            tabOrder.splice(toIdx, 0, movedTab);
+
+            activeTabIdx = tabOrder.indexOf(movedTab);
+            draggedTabId = null;
+            save();
+            render();
+        }
+
+        function triggerEditSets(e, id) {
+            e.stopPropagation();
+            const currentTab = tabOrder[activeTabIdx];
+            const ex = workouts[currentTab].find(item => item.id === id);
+            openModal("Sets Amount", "Enter number of sets...", ex.sets, (val) => {
+                ex.sets = val;
+                save(); render();
+            });
+        }
+
+        function triggerEditReps(e, id) {
+            e.stopPropagation();
+            const currentTab = tabOrder[activeTabIdx];
+            const ex = workouts[currentTab].find(item => item.id === id);
+            openModal("Rep Range", "Enter reps (e.g. 10-12)...", ex.reps, (val) => {
+                ex.reps = val;
+                save(); render();
+            });
+        }
+
+        function triggerAddWorkout() {
+            openModal("New Workout", "Enter workout name...", "", (name) => {
+                if (name) {
+                    const id = 'ex_' + Date.now();
+                    workouts[tabOrder[activeTabIdx]].push({ id, name, sets: 3, reps: '10' });
+                    save(); render();
+                }
+            });
+        }
+
+        function triggerAddTab() {
+            openModal("New Day", "Enter day name (e.g. Arms)...", "", (name) => {
+                if (name && !tabOrder.includes(name)) {
+                    tabOrder.push(name);
+                    workouts[name] = [];
+                    save(); render();
+                }
+            });
+        }
+
+        function setActiveTab(idx) {
+            activeTabIdx = Math.max(0, Math.min(idx, tabOrder.length - 1));
+            renderTabs();
+            syncPageOffset();
+            updateProgress();
+        }
+
+        function toggleWorkout(id) {
+            if (isEditMode) return;
+            if (completedIds.includes(id)) {
+                completedIds = completedIds.filter(i => i !== id);
+            } else {
+                completedIds.push(id);
+                if (navigator.vibrate) navigator.vibrate(10);
+            }
+            save(); render();
+        }
+
+        function toggleLevelUp(e, id) {
+            e.stopPropagation();
+            if (isEditMode) return;
+            if (levelUpIds.includes(id)) levelUpIds = levelUpIds.filter(i => i !== id);
+            else levelUpIds.push(id);
+            save(); render();
+        }
+
+        function adjustWeight(id, delta) {
+            weights[id] = Math.max(0, (weights[id] || 0) + delta);
+            save(); render();
+        }
+
+        function manualWeight(id, val) {
+            weights[id] = parseFloat(val) || 0;
+            save();
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const btn = document.getElementById('edit-btn');
+            const label = document.getElementById('mode-label');
+            if (isEditMode) {
+                btn.classList.add('bg-sky-500', 'border-sky-400', 'text-white');
+                label.innerText = "Edit Mode Active";
+            } else {
+                btn.classList.remove('bg-sky-500', 'border-sky-400', 'text-white');
+                label.innerText = "Precision Tracker";
+            }
+            render();
+        }
+
+        function updateProgress() {
+            const currentTab = tabOrder[activeTabIdx];
+            const list = workouts[currentTab] || [];
+            const done = list.filter(ex => completedIds.includes(ex.id)).length;
+            const pct = list.length > 0 ? Math.round((done / list.length) * 100) : 0;
+            const isFinished = pct === 100 && list.length > 0;
+
+            const bar = document.getElementById('progress-bar');
+            const card = document.getElementById('progress-card');
+            const label = document.getElementById('progress-type-label');
+            const text = document.getElementById('progress-pct-text');
+            
+            bar.style.width = pct + '%';
+            text.innerText = pct + '%';
+            document.getElementById('active-tab-label').innerText = currentTab + ' Mastery';
+
+            if (isFinished) {
+                bar.classList.add('progress-green');
+                card.classList.add('border-green-500/40', 'bg-green-500/10');
+                label.classList.add('text-green-400');
+                label.innerText = "Daily Goal Met";
+            } else {
+                bar.classList.remove('progress-green');
+                card.classList.remove('border-green-500/40', 'bg-green-500/10');
+                label.classList.remove('text-green-400');
+                label.innerText = "Session Progress";
+            }
+        }
+
+        function resetDaily() {
+            if (confirm("Reset all checkmarks for today?")) {
+                completedIds = [];
+                save(); render();
+            }
+        }
+
+        function removeTab(e, name) {
+            e.stopPropagation();
+            if (tabOrder.length > 1 && confirm(`Delete ${name} day?`)) {
+                tabOrder = tabOrder.filter(t => t !== name);
+                delete workouts[name];
+                activeTabIdx = 0;
+                save(); render();
+            }
+        }
+
+        function removeWorkout(e, id) {
+            e.stopPropagation();
+            const currentTab = tabOrder[activeTabIdx];
+            workouts[currentTab] = workouts[currentTab].filter(w => w.id !== id);
+            completedIds = completedIds.filter(i => i !== id);
+            save(); render();
+        }
+
+        document.addEventListener('touchstart', e => {
+            if (isEditMode) return;
+            touchStartX = e.touches[0].clientX;
+        }, {passive: true});
+
+        document.addEventListener('touchend', e => {
+            if (isEditMode) return;
+            const touchEndX = e.changedTouches[0].clientX;
+            const diff = touchStartX - touchEndX;
+            if (Math.abs(diff) > 70) {
+                if (diff > 0 && activeTabIdx < tabOrder.length - 1) setActiveTab(activeTabIdx + 1);
+                else if (diff < 0 && activeTabIdx > 0) setActiveTab(activeTabIdx - 1);
+            }
+        }, {passive: true});
+
+        window.onload = render;
+    </script>
+</body>
+</html>
